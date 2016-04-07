@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Export generator="Cache" version="25" zv="Cache for Windows (x86-64) 2016.2 (Build 594U)" ts="2016-03-29 16:25:29">
+<Export generator="Cache" version="25" zv="Cache for Windows (x86-64) 2016.2 (Build 594U)" ts="2016-04-07 17:38:20">
 <Class name="App.RestHandler">
 <IncludeCode>%IKPublic</IncludeCode>
 <Super>%CSP.REST</Super>
-<TimeChanged>64002,41766.683349</TimeChanged>
+<TimeChanged>64015,39082.778813</TimeChanged>
 <TimeCreated>63984,39913.900924</TimeCreated>
 
 <XData name="UrlMap">
@@ -108,7 +108,7 @@
 				Write "}"
 			} else {
 				Write "{ ""Status"" : 0,"
-				Write "  ""Message"" : ""Transaction refused by Trade Compliance"", "
+				Write "  ""Message"" : ""Transaction refused by Trade Compliance violating Rule"", "
 				Write "  ""Rules"" : [ "
 				For iMsg=1:1:msg {
 					If iMsg>1 Write ","
@@ -254,7 +254,7 @@
 
 
 <Class name="App.Rules">
-<TimeChanged>64002,41341.692097</TimeChanged>
+<TimeChanged>64015,63320.483632</TimeChanged>
 <TimeCreated>63988,55442.458372</TimeCreated>
 
 <Method name="Test">
@@ -307,7 +307,7 @@
 	Do ..GetMappings(.mapping)
 	;loop thru rules for customer
 	Set custId = obj.Customer
-	Set custName="Defensive Pension Fund"
+	Set custName = ##class(Data.Customer).NameGetStored(custId)
 	Set sc = sqlStatement.%Prepare("Select ID From Demo_RulesBuilder.SavedRule Where (DocumentName = ?) or (Comments = ?)")
 	If sc {
 		Set sqlResult = sqlStatement.%Execute(custName, custId)	
@@ -583,7 +583,7 @@ Long or Short</Description>
 </Class>
 
 
-<Project name="Trader" LastModified="2016-03-29 16:24:44.320792">
+<Project name="Trader" LastModified="2016-04-07 17:34:16.441068">
   <Items>
     <ProjectItem name="App.RestHandler" type="CLS"></ProjectItem>
     <ProjectItem name="App.Rules" type="CLS"></ProjectItem>
@@ -722,7 +722,8 @@ traderApp
 <CSP name="modalPortfolio.csp" application="/csp/trader/" default="1"><![CDATA[
 
 <div class="modal-header">
-  <h3 class="modal-title">Edit new entry {{portfolio.ID}}</h3>
+  <h3 ng-show="portfolio.ID!==undefined" class="modal-title">Modify Existing Position {{portfolio.ID}}</h3>
+  <h3 ng-show="portfolio.ID==undefined" class="modal-title">Create New Trade</h3>
 </div> 
 
 <div class="modal-body">
@@ -784,24 +785,29 @@ traderApp
 
 <div class="modal-footer">
   <!-- Save | Delete -->
-  <button type="button" class="btn btn-info" ng-click="check();">
+
+<!--  <button type="button" class="btn btn-info" ng-click="check();" >
     <span class=" glyphicon glyphicon-arrow-left"></span> Check
   </button>
-  <button type="button" class="btn btn-primary" ng-click="save();">
-    <span class=" glyphicon glyphicon-floppy-disk"></span> Save
+-->
+  <button type="button" class="btn btn-primary" ng-click="save();" ng-disabled="!tradeOK">
+    <span class=" glyphicon glyphicon-floppy-disk"></span> Execute Trade
   </button>
   <button type="button" class="btn btn-danger" ng-click="remove();">
-    <span class=" glyphicon glyphicon-remove"></span> Delete
+    <span class=" glyphicon glyphicon-remove"></span> Remove Trade
   </button>
   <button type="button" class="btn btn-warning" ng-click="cancel();">
     <span class=" glyphicon glyphicon-arrow-left"></span> Cancel
   </button>
 
   <div ng-repeat="rule in message.Rules">
+	<div align="left"><strong>{{message.Message}} : </strong></div>
     <div align="left" class="alert" ng-class="{'alert-danger':message.Status==0, 'alert-success':message.Status==1}">
-      <strong>{{message.Message}}</strong><br>
-        Rule : {{rule.Rule}}<br>
-        Investment Management Agreement : <br>{{rule.Paragraph}}
+        {{rule.Rule}}
+    </div>
+	<div align="left"><strong>Extract from Investment Management Agreement : </strong></div>
+    <div align="left" class="alert" ng-class="{'alert-danger':message.Status==0, 'alert-success':message.Status==1}">
+        {{rule.Paragraph}}
     </div>
   </div>
 </div>
@@ -36776,10 +36782,7 @@ angular.module("ui.bootstrap",["ui.bootstrap.tpls","ui.bootstrap.transition","ui
 	<th ng-click="sort('Industry')">Industry
       <i ng-class="{'glyphicon glyphicon-chevron-up': isSortUp('Industry'), 'glyphicon glyphicon-chevron-down': isSortDown('Industry')}"></i>
 	</th>
-	<th ng-click="sort('Percentage')">Percentage
-	  <i ng-class="{'glyphicon glyphicon-chevron-up': isSortUp('Percentage'), 'glyphicon glyphicon-chevron-down': isSortDown('Percentage')}"></i>
-	</th>
-    <th ng-click="showModalPortfolio()">
+    <th ng-click="showModalPortfolio(customer, portfolio)">
       <span class="glyphicon glyphicon-plus"></span>
     </th>
   </thead>
@@ -36793,8 +36796,7 @@ angular.module("ui.bootstrap",["ui.bootstrap.tpls","ui.bootstrap.transition","ui
 	<td>{{portfolio.Value}}</td>
 	<td>{{portfolio.Currency}}</td>
 	<td>{{portfolio.Industry}}</td>
-	<td>{{portfolio.Percentage}}</td>
-    <td ng-click="showModalPortfolio(portfolio)">
+    <td ng-click="showModalPortfolio(customer,portfolio)">
       <span class="glyphicon glyphicon-pencil"></span>
     </td>
   </tr>
@@ -36863,7 +36865,7 @@ var portfolio = angular.module('portfolio', ['ngResource', 'ui.bootstrap']);
 	 });   
    }
 
-  $scope.showModalPortfolio = function(portfolio) {
+  $scope.showModalPortfolio = function(customer, portfolio) {
      $modal.open({
             'templateUrl':'modalPortfolio.csp',
             'controller':['$scope','$modalInstance','restCheckRules',function($scope, $modalInstance,restCheckRules){
@@ -36872,7 +36874,13 @@ var portfolio = angular.module('portfolio', ['ngResource', 'ui.bootstrap']);
                 $scope.currencies = ['USD', 'EUR', 'CAD', 'JPY'];
                 $scope.industries = ['Alcohol', 'Industry', 'Insurance', 'Technology', 'Tobacco'];
 				$scope.ratings    = ['AAA', 'AA', 'A', 'BAA', 'BBB', 'BA', 'BB', 'B', 'CAA', 'CCC', 'CA', 'CC', 'C', 'D', 'R'];
-                $scope.portfolio = portfolio;
+                $scope.tradeOk    = true;
+                if (portfolio == undefined) {
+                	$scope.portfolio = { 'Customer' : customer.ID};
+                } else { 
+                	$scope.portfolio = portfolio;
+                }
+                console.log($scope.portfolio);
                 $scope.save = function() {
 	                $modalInstance.close({portfolio:$scope.portfolio, action:'save'});
 	            };
@@ -36886,6 +36894,7 @@ var portfolio = angular.module('portfolio', ['ngResource', 'ui.bootstrap']);
 	            	$scope.message = 'checking rule';
 	            	restCheckRules.check($scope.portfolio, function(data) {
 	            	  $scope.message = data;
+	            	  $scope.tradeOK = data.Status;
 	            	});
 	            };
             }]
